@@ -1,0 +1,59 @@
+version: '3.9'
+services:
+    php:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        user: 1001:1001
+        container_name: serverless_test_php
+        restart: unless-stopped
+        tty: true
+        environment:
+            - PHP_IDE_CONFIG="serverName=serverlesstest.loc"
+            - XDG_CONFIG_HOME=/var/www/serverless_test
+        volumes:
+            - ./:/var/www/serverless_test
+            - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+        networks:
+            - app-network
+        extra_hosts:
+            - host.docker.internal:host-gateway
+
+    nginx:
+        image: nginx:stable-alpine
+        container_name: serverless_test_nginx
+        restart: unless-stopped
+        tty: true
+        networks:
+            app-network:
+                aliases:
+                    - "serverlesstest.loc"
+        ports:
+            - "80:80"
+        volumes:
+            - ./:/var/www/serverless_test:cached
+            - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+        depends_on:
+            php:
+                condition: service_started
+
+    mysql:
+        image: mariadb:11.3
+        container_name: serverless_test_mysql
+        restart: unless-stopped
+        tty: true
+        networks:
+            - app-network
+        ports:
+            - "3306:3306"
+        environment:
+            MYSQL_DATABASE: serverless_test
+            MYSQL_ROOT_PASSWORD: root
+            MYSQL_USER: serverless_test
+            MYSQL_PASSWORD: password
+        volumes:
+            - ./docker/mysql:/var/lib/mysql
+
+networks:
+    app-network:
+        driver: bridge
