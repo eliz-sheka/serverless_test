@@ -4,7 +4,7 @@ provider:
     name: aws
     # The AWS region in which to deploy (us-east-1 is the default)
     region: us-east-1
-    profile: 211125325981_AdministratorAccess
+    profile: s3_serverless_test_user
     # Environment variables
     environment:
         APP_ENV: ${sls:stage}
@@ -20,13 +20,16 @@ provider:
         DB_DATABASE: ${ssm:/sandbox/serverless-test/rds-dbname}
         AWS_BUCKET: !Ref ServerlessTestS3Bucket
         FILESYSTEM_DISK: s3
-        CUSTOM_AWS_ACCESS_KEY_ID: ${ssm:/sandbox/serverless-test/aws-access-key}
-        CUSTOM_AWS_SECRET_ACCESS_KEY: ${ssm:/sandbox/serverless-test/aws-secret-access-key}
-        CUSTOM_AWS_DEFAULT_REGION: us-east-1
-        SNS_ARN: 'arn:aws:sns:us-east-1:211125325981:UserEvents'
-#        AWS_URL: 'arn:aws:s3:::serverless-test-s3-bucket'
+        SNS_ARN: !Ref MySNSTopic
 
     iamRoleStatements:
+      - Effect: "Allow"
+        Action:
+          - 'ssm:GetParameters'
+          - 'ssm:GetParameter'
+          - 'ssm:GetParametersByPath'
+        Resource:
+          - 'arn:aws:ssm:us-east-1::parameter/*'
       - Effect: "Allow"
         Action:
           - 's3:*'
@@ -35,9 +38,9 @@ provider:
           - !Sub '${ServerlessTestS3Bucket.Arn}/*' # and everything inside
       - Effect: "Allow"
         Action:
-          - 'sns:*'
+          - 'sns:Publish'
         Resource:
-          - 'arn:aws:sns:us-east-1:211125325981:UserEvents'
+          - !Ref MySNSTopic
 
 
 package:
@@ -66,11 +69,7 @@ functions:
         handler: artisan
         runtime: php-82-console
         timeout: 720 # in seconds
-        # Uncomment to also run the scheduler every minute
-        #events:
-        #    - schedule:
-        #          rate: rate(1 minute)
-        #          input: '"schedule:run"'
+
 
 resources:
   Resources:

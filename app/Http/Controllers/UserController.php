@@ -8,12 +8,12 @@ use App\Http\Requests\StoreImageRequest;
 use App\Http\Requests\StoreScheduleRequest;
 use App\Http\Requests\StoreUserRequest;
 use App\Models\User;
-use App\Services\CSVReader;
-use AWS\CRT\Log;
-use Aws\Sns\SnsClient;
+use App\Services\SNS\SNSPublisher;
+use Aws\Exception\AwsException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class UserController
@@ -40,7 +40,7 @@ class UserController
         ], Response::HTTP_CREATED);
     }
 
-    public function storeImage(StoreImageRequest $request, User $user): JsonResponse
+    public function storeImage(StoreImageRequest $request, User $user, SNSPublisher $snsPublisher): JsonResponse
     {
         if ($profileImage = $user->profileImage) {
             if (Storage::disk('s3')->delete($profileImage->url)) {
@@ -54,12 +54,25 @@ class UserController
 
         if ($path) {
             $user->profileImage()->create(['url' => $path, 'type' => ImageType::PROFILE->value]);
+
+            $config = Config::get('services.sns');
+
+            $snsPublisher->publish(
+                $config['arn'],
+                json_encode(['UserID' => $userKey]),
+                [
+                    'MessageType' => [
+                        'DataType' => 'String',
+                        'StringValue' => 'ProfileImageLoaded',
+                    ]
+                ],
+            );
         }
 
         return new JsonResponse($user->load('profileImage'), Response::HTTP_CREATED);
     }
 
-    public function storeSchedule(StoreScheduleRequest $request, User $user): JsonResponse
+    public function storeSchedule(StoreScheduleRequest $request, User $user, SNSPublisher $snsPublisher): JsonResponse
     {
         $userKey = $user->getKey();
         $file = $request->file('file');
@@ -67,28 +80,27 @@ class UserController
         $path = Storage::disk('s3')->putFile(sprintf('users/%s/schedule', $userKey), $file);
 
         if (false === $path) {
-            Log::log(Log::INFO, 'Unable to store schedule file');
+            Log::info('Unable to store schedule file');
         }
 
         $config = Config::get('services.sns');
 
-        $snsClient = new SnsClient([
-            'version' => 'latest',
-            'region' => $config['region'],
-            'credentials' => [
-                'key' => $config['key'],
-                'secret' => $config['secret'],
-            ],
-        ]);
+        try {
+            $result = $snsPublisher->publish(
+                $config['arn'],
+                json_encode(['UserID' => $userKey, 'FileName' => basename($path)]),
+                [
+                    'MessageType' => [
+                        'DataType' => 'String',
+                        'StringValue' => 'ScheduleLoaded',
+                    ]
+                ],
+            );
+        } catch (AwsException $e) {
+            // output error message if fails
+            Log::error($e->getMessage());
+        }
 
-        $result = $snsClient->publish([
-            'TopicArn' => $config['arn'],
-            'Message' => json_encode([
-                'UserID' => $userKey,
-                'Type' => 'ScheduleLoaded'
-            ]),
-        ]);
-
-        return new JsonResponse($config + ['loaded' => $path] + $result->toArray(), Response::HTTP_CREATED);
+        return new JsonResponse(['loaded' => $path, 'snsData' => $result->toArray()], Response::HTTP_CREATED);
     }
 }
