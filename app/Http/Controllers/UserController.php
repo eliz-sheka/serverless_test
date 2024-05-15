@@ -91,7 +91,7 @@ class UserController
         }
 
         try {
-            $snsPublisher->publish(
+            $result = $snsPublisher->publish(
                 json_encode(['UserID' => $userKey, 'FileName' => basename($path)]),
                 [
                     'MessageType' => [
@@ -101,12 +101,9 @@ class UserController
                 ],
             );
         } catch (\Exception $e) {
-            $message = $e->getMessage();
-            Log::error($message);
-
-            return new JsonResponse(['error' => $message], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        return new JsonResponse(['loaded' => $path], Response::HTTP_CREATED);
+        return new JsonResponse(['loaded' => $path, 'snsResult' => $result?->toArray()], Response::HTTP_CREATED);
     }
 }

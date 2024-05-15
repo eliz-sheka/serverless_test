@@ -4,18 +4,16 @@ namespace App\Services\SNS;
 
 use Aws\Result;
 use Aws\Sns\SnsClient;
-use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Log;
 
 class SNSPublisher
 {
-    protected ?string $topic = null;
-
     /**
      * @param SnsClient $client
      */
-    public function __construct(private SnsClient $client)
+    public function __construct(private SnsClient $client, private string $topic)
     {
-        $this->topic = Config::get('services.sns.arn');
+
     }
 
     /**
@@ -29,11 +27,17 @@ class SNSPublisher
     {
         $this->checkTopic($topic);
 
-        return $this->client->publish([
-            'TopicArn' => $this->topic,
-            'Message' => $message,
-            'MessageAttributes' => $attributes,
-        ]);
+        try {
+            return $this->client->publish([
+                'TopicArn' => $this->topic,
+                'Message' => $message,
+                'MessageAttributes' => $attributes,
+            ]);
+        } catch (\Exception $e) {
+            Log::error($e->getMessage());
+
+            throw $e;
+        }
     }
 
     /**
@@ -45,8 +49,6 @@ class SNSPublisher
     {
         if (!empty($topic)) {
             $this->topic = $topic;
-        } elseif (empty($this->topic)) {
-            throw new \Exception('Topic is required');
         }
     }
 }

@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Events\UserCreated;
 use App\Listeners\UserCreatedActions;
+use App\Services\SNS\SNSPublisher;
 use Aws\Sns\SnsClient;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -15,18 +16,27 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->singleton(SnsClient::class, function ($app) {
+        $this->app->singleton(SNSPublisher::class, function ($app) {
             $config = $app['config']['services']['sns'];
 
-            return new SnsClient([
-                'version' => 'latest',
-                'region' => $config['region'],
-                'credentials' => [
-                    'key' => $config['key'],
-                    'secret' => $config['secret'],
-                    'token' => $config['token'],
-                ],
-            ]);
+            foreach ($config as $item) {
+                if (!$item) {
+                    throw new \RuntimeException('Missing SNS configuration');
+                }
+            }
+
+            return new SNSPublisher(
+                new SnsClient([
+                    'version' => 'latest',
+                    'region' => $config['region'],
+                    'credentials' => [
+                        'key' => $config['key'],
+                        'secret' => $config['secret'],
+                        'token' => $config['token'],
+                    ],
+                ]),
+                $config['arn']
+            );
         });
     }
 

@@ -22,18 +22,14 @@ class UserCreatedActions
      */
     public function handle(UserCreated $event): void
     {
-        try {
-            $this->snsPublisher->publish(
-                json_encode(['UserID' => $event->userId]),
-                [
-                    'MessageType' => [
-                        'DataType' => 'String',
-                        'StringValue' => 'UserCreated',
-                    ]
-                ],
-            );
-        } catch (\Exception $e) {
-            Log::error($e->getMessage());
-        }
+        $this->snsPublisher->publish(
+            json_encode(['UserID' => $event->userId]),
+            [
+                'MessageType' => [
+                    'DataType' => 'String',
+                    'StringValue' => 'UserCreated',
+                ]
+            ],
+        );
     }
 }
