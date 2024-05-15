@@ -9,20 +9,25 @@ use App\Http\Requests\StoreScheduleRequest;
 use App\Http\Requests\StoreUserRequest;
 use App\Models\User;
 use App\Services\SNS\SNSPublisher;
-use Aws\Exception\AwsException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class UserController
 {
+    /**
+     * @return JsonResponse
+     */
     public function index(): JsonResponse
     {
         return new JsonResponse(User::with(['profileImage'])->get()->all());
     }
 
+    /**
+     * @param StoreUserRequest $request
+     * @return JsonResponse
+     */
     public function store(StoreUserRequest $request): JsonResponse
     {
         /** @var User $user */
@@ -40,6 +45,12 @@ class UserController
         ], Response::HTTP_CREATED);
     }
 
+    /**
+     * @param StoreImageRequest $request
+     * @param User $user
+     * @param SNSPublisher $snsPublisher
+     * @return JsonResponse
+     */
     public function storeImage(StoreImageRequest $request, User $user, SNSPublisher $snsPublisher): JsonResponse
     {
         if ($profileImage = $user->profileImage) {
@@ -52,26 +63,22 @@ class UserController
         $image = $request->file('image');
         $path = Storage::disk('s3')->putFile(sprintf('users/%s/profile', $userKey), $image);
 
-        if ($path) {
-            $user->profileImage()->create(['url' => $path, 'type' => ImageType::PROFILE->value]);
-
-            $config = Config::get('services.sns');
-
-            $snsPublisher->publish(
-                $config['arn'],
-                json_encode(['UserID' => $userKey]),
-                [
-                    'MessageType' => [
-                        'DataType' => 'String',
-                        'StringValue' => 'ProfileImageLoaded',
-                    ]
-                ],
-            );
+        if (false === $path) {
+            return new JsonResponse(['error' => 'Unable to store image'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+
+        $user->profileImage()->create(['url' => $path, 'type' => ImageType::PROFILE->value]);
 
         return new JsonResponse($user->load('profileImage'), Response::HTTP_CREATED);
     }
 
+    /**
+     * @param StoreScheduleRequest $request
+     * @param User $user
+     * @param SNSPublisher $snsPublisher
+     * @return JsonResponse
+     * @throws \Exception
+     */
     public function storeSchedule(StoreScheduleRequest $request, User $user, SNSPublisher $snsPublisher): JsonResponse
     {
         $userKey = $user->getKey();
@@ -80,14 +87,11 @@ class UserController
         $path = Storage::disk('s3')->putFile(sprintf('users/%s/schedule', $userKey), $file);
 
         if (false === $path) {
-            Log::info('Unable to store schedule file');
+            return new JsonResponse(['error' => 'Unable to store schedule file'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        $config = Config::get('services.sns');
-
         try {
-            $result = $snsPublisher->publish(
-                $config['arn'],
+            $snsPublisher->publish(
                 json_encode(['UserID' => $userKey, 'FileName' => basename($path)]),
                 [
                     'MessageType' => [
@@ -96,11 +100,13 @@ class UserController
                     ]
                 ],
             );
-        } catch (AwsException $e) {
-            // output error message if fails
-            Log::error($e->getMessage());
+        } catch (\Exception $e) {
+            $message = $e->getMessage();
+            Log::error($message);
+
+            return new JsonResponse(['error' => $message], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        return new JsonResponse(['loaded' => $path, 'snsData' => $result->toArray()], Response::HTTP_CREATED);
+        return new JsonResponse(['loaded' => $path], Response::HTTP_CREATED);
     }
 }

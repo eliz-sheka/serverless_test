@@ -46,6 +46,7 @@ class GenerateSchedule extends Command
 
                 fputcsv($file, [$date->format('Y-m-d'), $startTimeStr, $endTimeStr, $type]);
             }
+
             $startTime->setTime(9, 0);
         }
 

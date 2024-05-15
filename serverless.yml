@@ -2,7 +2,6 @@ service: laravel-serveless-test
 
 provider:
     name: aws
-    # The AWS region in which to deploy (us-east-1 is the default)
     region: us-east-1
     profile: s3_serverless_test_user
     # Environment variables
@@ -23,19 +22,23 @@ provider:
         SNS_ARN: !Ref MySNSTopic
 
     iamRoleStatements:
-      - Effect: "Allow"
+      - Effect: 'Allow'
         Action:
           - 'ssm:GetParameters'
           - 'ssm:GetParameter'
           - 'ssm:GetParametersByPath'
         Resource:
-          - 'arn:aws:ssm:us-east-1::parameter/*'
-      - Effect: "Allow"
+          Fn::Join:
+            - ""
+            - - "arn:aws:ssm:"
+              - !Ref "AWS::Region"
+              - "::parameter/*"
+      - Effect: 'Allow'
         Action:
           - 's3:*'
         Resource:
-          - !Sub '${ServerlessTestS3Bucket.Arn}' # the storage bucket
-          - !Sub '${ServerlessTestS3Bucket.Arn}/*' # and everything inside
+          - !Sub "${ServerlessTestS3Bucket.Arn}" # the storage bucket
+          - !Sub "${ServerlessTestS3Bucket.Arn}/*" # and everything inside
       - Effect: "Allow"
         Action:
           - 'sns:Publish'
@@ -81,8 +84,8 @@ resources:
       Type: AWS::EC2::InternetGateway
       Properties:
         Tags:
-          - Key: "Name"
-            Value: "ServerlessInternetGateway"
+          - Key: 'Name'
+            Value: 'ServerlessInternetGateway'
     ServerlessVPC:
       Type: AWS::EC2::VPC
       Properties:
@@ -91,8 +94,8 @@ resources:
         EnableDnsHostnames: true
         InstanceTenancy: default
         Tags:
-          - Key: "Name"
-            Value: "ServerlessVPC"
+          - Key: 'Name'
+            Value: 'ServerlessVPC'
     ServerlessVPCGA:
       Type: AWS::EC2::VPCGatewayAttachment
       Properties:
@@ -109,8 +112,8 @@ resources:
         AvailabilityZone: ${self:provider.region}a
         CidrBlock: 10.0.0.0/24
         Tags:
-          - Key: "Name"
-            Value: "ServerlessSubnetA"
+          - Key: 'Name'
+            Value: 'ServerlessSubnetA'
     ServerlessSubnetB:
       DependsOn: ServerlessVPC
       Type: AWS::EC2::Subnet
@@ -120,8 +123,8 @@ resources:
         AvailabilityZone: ${self:provider.region}b
         CidrBlock: 10.0.1.0/24
         Tags:
-          - Key: "Name"
-            Value: "ServerlessSubnetB"
+          - Key: 'Name'
+            Value: 'ServerlessSubnetB'
     ServerlessSubnetC:
       DependsOn: ServerlessVPC
       Type: AWS::EC2::Subnet
@@ -131,19 +134,19 @@ resources:
         AvailabilityZone: ${self:provider.region}c
         CidrBlock: 10.0.2.0/24
         Tags:
-          - Key: "Name"
-            Value: "ServerlessSubnetC"
+          - Key: 'Name'
+            Value: 'ServerlessSubnetC'
     ServerlessSubnetGroup:
       Type: AWS::RDS::DBSubnetGroup
       Properties:
-        DBSubnetGroupDescription: "RDS Subnet Group"
+        DBSubnetGroupDescription: 'RDS Subnet Group'
         SubnetIds:
           - Ref: ServerlessSubnetA
           - Ref: ServerlessSubnetB
           - Ref: ServerlessSubnetC
         Tags:
-          - Key: "Name"
-            Value: "ServerlessSubnetGroup"
+          - Key: 'Name'
+            Value: 'ServerlessSubnetGroup'
     ServerlessSecurityGroup:
       DependsOn: ServerlessVPC
       Type: AWS::EC2::SecurityGroup
@@ -155,10 +158,10 @@ resources:
           - IpProtocol: tcp
             FromPort: '0'
             ToPort: '65535'
-            CidrIp: "0.0.0.0/0"
+            CidrIp: '0.0.0.0/0'
         Tags:
-          - Key: "Name"
-            Value: "ServerlessSecurityGroup"
+          - Key: 'Name'
+            Value: 'ServerlessSecurityGroup'
     RouteTablePublic:
       Type: AWS::EC2::RouteTable
       Properties:

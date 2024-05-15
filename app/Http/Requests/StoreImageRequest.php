@@ -6,6 +6,9 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreImageRequest extends FormRequest
 {
+    /**
+     * @return array[]
+     */
     public function rules(): array
     {
         return [
