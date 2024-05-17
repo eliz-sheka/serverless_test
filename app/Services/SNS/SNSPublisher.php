@@ -4,12 +4,12 @@ namespace App\Services\SNS;
 
 use Aws\Result;
 use Aws\Sns\SnsClient;
-use Illuminate\Support\Facades\Log;
 
 class SNSPublisher
 {
     /**
      * @param SnsClient $client
+     * @param string $topic
      */
     public function __construct(private SnsClient $client, private string $topic)
     {
@@ -25,30 +25,10 @@ class SNSPublisher
      */
     public function publish(string $message, array $attributes = [], ?string $topic = null): Result
     {
-        $this->checkTopic($topic);
-
-        try {
-            return $this->client->publish([
-                'TopicArn' => $this->topic,
-                'Message' => $message,
-                'MessageAttributes' => $attributes,
-            ]);
-        } catch (\Exception $e) {
-            Log::error($e->getMessage());
-
-            throw $e;
-        }
-    }
-
-    /**
-     * @param string|null $topic
-     * @return void
-     * @throws \Exception
-     */
-    private function checkTopic(?string $topic): void
-    {
-        if (!empty($topic)) {
-            $this->topic = $topic;
-        }
+        return $this->client->publish([
+            'TopicArn' => $topic ?? $this->topic,
+            'Message' => $message,
+            'MessageAttributes' => $attributes,
+        ]);
     }
 }

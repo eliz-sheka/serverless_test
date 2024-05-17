@@ -90,20 +90,16 @@ class UserController
             return new JsonResponse(['error' => 'Unable to store schedule file'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        try {
-            $result = $snsPublisher->publish(
-                json_encode(['UserID' => $userKey, 'FileName' => basename($path)]),
-                [
-                    'MessageType' => [
-                        'DataType' => 'String',
-                        'StringValue' => 'ScheduleLoaded',
-                    ]
-                ],
-            );
-        } catch (\Exception $e) {
-            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+        $result = $snsPublisher->publish(
+            json_encode(['UserID' => $userKey, 'FileName' => basename($path)]),
+            [
+                'MessageType' => [
+                    'DataType' => 'String',
+                    'StringValue' => 'ScheduleLoaded',
+                ]
+            ],
+        );
 
-        return new JsonResponse(['loaded' => $path, 'snsResult' => $result?->toArray()], Response::HTTP_CREATED);
+        return new JsonResponse(['loaded' => $path, 'snsResult' => $result->toArray()], Response::HTTP_CREATED);
     }
 }

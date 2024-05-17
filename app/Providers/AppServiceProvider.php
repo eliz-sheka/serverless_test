@@ -8,6 +8,7 @@ use App\Services\SNS\SNSPublisher;
 use Aws\Sns\SnsClient;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use RuntimeException;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -17,25 +18,27 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(SNSPublisher::class, function ($app) {
-            $config = $app['config']['services']['sns'];
+            $key = $app->config->get('services.sns.key');
+            $secret = $app->config->get('services.sns.secret');
+            $token = $app->config->get('services.sns.token');
+            $region = $app->config->get('services.sns.region');
+            $topicArn = $app->config->get('services.sns.arn');
 
-            foreach ($config as $item) {
-                if (!$item) {
-                    throw new \RuntimeException('Missing SNS configuration');
-                }
+            if (!$key || !$secret || !$region || !$topicArn || !$token) {
+                throw new RuntimeException('Missing SNS config!');
             }
 
             return new SNSPublisher(
                 new SnsClient([
                     'version' => 'latest',
-                    'region' => $config['region'],
+                    'region' => $region,
                     'credentials' => [
-                        'key' => $config['key'],
-                        'secret' => $config['secret'],
-                        'token' => $config['token'],
+                        'key' => $key,
+                        'secret' => $secret,
+                        'token' => $token,
                     ],
                 ]),
-                $config['arn']
+                $topicArn
             );
         });
     }
